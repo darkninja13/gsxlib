@@ -41,10 +41,6 @@ class GsxLib
     $wsdl = 'https://gsx'.$environment.'.apple.com/gsx-ws/services/'.$region.'/asp?wsdl';
     $this->client = new SoapClient($wsdl, array('exceptions' => TRUE, 'trace' => 1));
     
-    if (session_id()) {
-      $_SESSION['_gsxlib_client'] = serialize($this->client);
-    }
-    
     if (!$this->client) {
       exit('Failed to create SOAP client.');
     }
