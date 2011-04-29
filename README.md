@@ -1,5 +1,5 @@
 ##About##
-GsxLib is a PHP library that simplifies communication with Apple's GSX web service API. It frees the application developer
+GsxLib is a PHP library that simplifies communication with Apple's [GSX web service API][1]. It frees the application developer
 from knowing the underlying PHP SOAP architecture and to some extent even the GSX API itself. GsxLib also tries to provide
 some performance benefits by minimizing the number of requests made to the servers as well as doing some rudimentary input
 validation (as opposed to burdening Apple's servers with totally invalid requests).
@@ -20,8 +20,8 @@ For more details, consult your distribution or http://php.net/manual/en/book.soa
 
 
 ##License##
-
-  DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE 
+    
+    DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE 
     Version 2, December 2004
     Copyright (C) 2004 Sam Hocevar <sam@hocevar.net> 
     Everyone is permitted to copy and distribute verbatim or modified 
@@ -31,3 +31,5 @@ For more details, consult your distribution or http://php.net/manual/en/book.soa
     DO WHAT THE FUCK YOU WANT TO PUBLIC LICENSE 
     TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION AND MODIFICATION 
     0. You just DO WHAT THE FUCK YOU WANT TO.
+
+[1]: http://gsxwsut.apple.com/apidocs/html/WSReference.html?user=asp
