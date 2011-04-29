@@ -95,7 +95,13 @@ class GsxLib
         'unitDetail'  => array('serialNumber' => $serialNumber)
     ));
     
-    $result = $this->client->WarrantyStatus($a);
+    try {
+      $result = $this->client->WarrantyStatus($a);
+    } catch (SoapFault $e) {
+      trigger_error($e->getMessage());
+      return FALSE;
+    }
+    
     return $result->WarrantyStatusResponse->warrantyDetailInfo;
   
   }

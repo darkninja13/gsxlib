@@ -8,7 +8,7 @@ validation (as opposed to burdening Apple's servers with totally invalid request
 ##Requrements##
 
 Your PHP should have SOAP support enabled. Most distributions should (including OS X Server 10.6 or later).
-For more details, consult your distribution or http://php.net/manual/en/book.soap.php.
+For more details, consult your distribution or the [PHP documentation][2].
 
 ##Usage##
 
@@ -19,7 +19,8 @@ Best illustrated with a simple example:
       include 'gsxlib/gsxlib.php';
       $gsx = new GsxLib('your sold-to account', 'gsx user', 'password');
       $info = $gsx->warrantyStatus('serialnumber');
-  
+      echo $info->productDescription;
+      > MacBook Pro (15-inch 2.4/2.2GHz)
     ?>
 
 
@@ -37,3 +38,4 @@ Best illustrated with a simple example:
     0. You just DO WHAT THE FUCK YOU WANT TO.
 
 [1]: http://gsxwsut.apple.com/apidocs/html/WSReference.html?user=asp
+[2]: http://php.net/manual/en/book.soap.php
