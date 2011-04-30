@@ -1,7 +1,11 @@
 <?php
 /**
  * gsxlib/gsxlib.php
+ * @package gsxlib
  * @author Filipp Lepalaan <filipp@mcare.fi>
+ * http://gsxwsut.apple.com/apidocs/html/WSReference.html?user=asp
+ * http://gsxwsut.apple.com/apidocs/html/WSArtifacts.html?user=asp
+ * @license
  * This program is free software. It comes without any warranty, to
  * the extent permitted by applicable law. You can redistribute it
  * and/or modify it under the terms of the Do What The Fuck You Want
@@ -15,8 +19,7 @@ class GsxLib
   private $session_id;
   private $environment;
   
-  
-  function __construct($account, $username, $password, $environment = 'ws', $region = 'emea', $tz = 'CEST')
+  function __construct($account, $username, $password, $environment = '', $region = 'emea', $tz = 'CEST')
   {
     if (!class_exists('SoapClient')) {
       exit('Looks like your PHP lacks SOAP support');
@@ -29,16 +32,18 @@ class GsxLib
     $regions = array('am', 'emea', 'apac', 'la');
     
     if (!in_array($region, $regions)) {
-      exit('Region must be one of: ' . implode(', ', $regions));
+      exit('Region '.$region.' should be one of: ' . implode(', ', $regions));
     }
     
-    $envirs = array('ws', 'ut', 'it');
+    $envirs = array('ut', 'it');
     
-    if (!in_array($environment, $envirs)) {
-      exit('Environment must be one of: ' . implode(', ', $envir));
+    if (!empty($environment)) {
+      if (!in_array($environment, $envirs)) {
+        exit('Environment '.$environment. ' should be one of: ' . implode(', ', $envirs));
+      }
     }
     
-    $wsdl = 'https://gsx'.$environment.'.apple.com/gsx-ws/services/'.$region.'/asp?wsdl';
+    $wsdl = 'https://gsxws'.$environment.'.apple.com/gsx-ws/services/'.$region.'/asp?wsdl';
     $this->client = new SoapClient($wsdl, array('exceptions' => TRUE, 'trace' => 1));
     
     if (!$this->client) {
@@ -60,11 +65,11 @@ class GsxLib
     
     try {
       $this->session_id = $this->client->Authenticate($a)->AuthenticateResponse->userSessionId;
-    } catch (Exception $e) {
-      exit('Authentication with GSX failed');
+    } catch (SoapFault $e) {
+      exit('Authentication with GSX failed. Does this GSX account have access to this environment?');
     }
     
-    // there's a session going, put the credentials in the
+    // there's a session going, put the credentials in there
     if (session_id()) {
       $_SESSION['_gsxlib_session_id'] = $this->session_id;
       $_SESSION['_gsxlib_session_timeout'] = time()+60*30;
@@ -72,12 +77,49 @@ class GsxLib
     
   }
   
-  public function partDetails($partNumber)
+  /**
+   * a shortcut for looking up part information
+   * @param mixed $string
+   * @return [bool|string]
+   */
+  public function partsLookup($string = null)
   {
-    if (!preg_match('/^\w+\-\w+^/', $partNumber)) {
-      exit('Invalid part number: ' . $partNumber);
+    $string = trim($string);
+    $what = $this->looksLike($string);
+    
+    if (!$what) {
+      exit('Invalid search term for part lookup: ' . $string);
     }
     
+    $req = array('PartsLookup' => array('lookupRequestData' => array($what => $string)));
+    return $this->request($req)->parts;
+  
+  }
+  
+  /**
+   * Try to "categorise" a string
+   * @param string $string
+   */
+  private function looksLike($string, $what = null)
+  {
+    $result = false;
+    
+    $rex = array(
+      'partNumber'                => '/^\w+\-\w+$/i',
+      'serialNumber'              => '/^[a-z0-9]{7,18}$/i',
+      'eeeCode'                   => '/^[a-z0-9]{3,4}$/i',
+      'repairNumber'              => '/^\d{12}$/',
+      'repairConfirmationNumber'  => '/^G\d{9}$/i'
+    );
+    
+    foreach ($rex as $k => $v) {
+      if (preg_match($v, $string)) {
+        $result = $k;
+      }
+    }
+    
+    return ($what) ? ($result == $what) : $result;
+  
   }
   
   /**
@@ -85,31 +127,37 @@ class GsxLib
    */
   public function warrantyStatus($serialNumber)
   {
-    if (!preg_match('/^[a-z0-9]{7,18}$/i', $serialNumber)) {
+    $serialNumber = trim($serialNumber);
+    
+    if (!$this->looksLike($serialNumber, 'serialNumber')) {
       exit('Invalid serial number: ' . $serialNumber);
     }
     
     $a = array(
-      'WarrantyStatusRequest' => array(
-        'userSession' => array('userSessionId' => $this->session_id),
-        'unitDetail'  => array('serialNumber' => $serialNumber)
-    ));
+      'WarrantyStatus' => array('unitDetail'  => array('serialNumber' => $serialNumber))
+      );
     
-    try {
-      $result = $this->client->WarrantyStatus($a);
-    } catch (SoapFault $e) {
-      trigger_error($e->getMessage());
-      return FALSE;
-    }
-    
-    return $result->WarrantyStatusResponse->warrantyDetailInfo;
+    return $this->request($a)->warrantyDetailInfo;
   
   }
   
-  public function request($args)
+  private function request($req)
   {
-    $info = $client->WarrantyStatus($a);
-    $out[] = $info->WarrantyStatusResponse->warrantyDetailInfo;
+    $result = false;
+    list($r, $p) = each($req);
+    $p['userSession'] = array('userSessionId' => $this->session_id);
+    $request = array($r.'Request' => $p);
+    
+    try {
+      $result = $this->client->$r($request);
+      $resp = "{$r}Response";
+      return $result->$resp;
+    } catch (SoapFault $e) {
+      trigger_error($e->getMessage());
+    }
+    
+    return $result;
+    
   }
   
 }

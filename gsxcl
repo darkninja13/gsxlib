@@ -1,0 +1,50 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * gsxlib/gsxcl
+ * @package gsxlib
+ * @author Filipp Lepalaan <filipp@mcare.fi>
+ */
+
+if (false) {
+  error_reporting(E_ALL|E_STRICT);
+}
+
+require 'gsxlib.php';
+
+if (count($argv) < 6) {
+  echo <<<EOT
+
+usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-m warranty|parts] [-q query]
+  -s  sold-to     your GSX Sold-To account.
+  -u  username    the Apple ID with GSX WS API access.
+  -p  password    the password for the Apple ID.
+  -r  region      Either "am" (America), "emea" (Europe, Middle-East, Africa)
+                  "apac" (Asia-Pacific) or "la" (Latin America). Defaults to "emea".
+  -e  environment the GSX environment. Either empty (production), "it" or "ut". Defaults to production.
+  -m  mode        What to search for. Currently either "warranty" (default) or "parts"
+  -q  query       A query string (serial number, order confirmation, repair number, EEE code, etc.
+                  Defaults to current serial number.
+  
+EOT;
+  exit();
+}
+
+$opts = getopt('s:u:p:r:e:m:q::');
+$gsx = new GsxLib($opts['s'], $opts['u'], $opts['p'], $opts['e'], $opts['r']);
+
+if (empty($opts['q'])) {
+  $opts['q'] = `system_profiler SPHardwareDataType | awk '/Serial Number/ {print $4}'`;
+}
+
+switch ($opts['m']) {
+  case 'warranty':
+    print_r($gsx->warrantyStatus($opts['q']));
+    break;
+  case 'parts':
+    print_r($gsx->partsLookup($opts['q']));
+    break;
+}
+
+?>

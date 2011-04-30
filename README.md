@@ -23,6 +23,12 @@ Best illustrated with a simple example:
       > MacBook Pro (15-inch 2.4/2.2GHz)
     ?>
 
+If you're in the US, remember to set the fifth argument to the constructor to 'am'.
+
+##gsxcl##
+
+The package includes a rudimentary command line client to the GSX API called gsxcl. Currently it can perform warranty checks
+and part lookups.
 
 ##License##
     
