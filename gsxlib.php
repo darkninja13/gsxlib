@@ -85,28 +85,34 @@ class GsxLib
   public function partsLookup($string = null)
   {
     $string = trim($string);
-    $what = $this->looksLike($string);
+    $what = self::looksLike($string);
     
     if (!$what) {
       exit('Invalid search term for part lookup: ' . $string);
     }
     
-    $req = array('PartsLookup' => array('lookupRequestData' => array($what => $string)));
+    $req = array('PartsLookup' => array(
+      'lookupRequestData' => array($what => $string)
+    ));
+    
     return $this->request($req)->parts;
   
   }
   
   /**
    * Try to "categorise" a string
+   * About identifying serial numbers - before 2010, Apple had a logical
+   *  serial number format, with structure, that you could id quite reliably.
+   *  unfortunately, it's no longer the case
    * @param string $string
    */
-  private function looksLike($string, $what = null)
+  static function looksLike($string, $what = null)
   {
     $result = false;
     
     $rex = array(
-      'partNumber'                => '/^\w+\-\w+$/i',
-      'serialNumber'              => '/^[a-z0-9]{7,18}$/i',
+      'partNumber'                => '/^[a-z]?\d{3}\-\d{4}$/i',
+      'serialNumber'              => '/^[a-z0-9]{11,12}$/i',
       'eeeCode'                   => '/^[a-z0-9]{3,4}$/i',
       'repairNumber'              => '/^\d{12}$/',
       'repairConfirmationNumber'  => '/^G\d{9}$/i'
@@ -129,7 +135,7 @@ class GsxLib
   {
     $serialNumber = trim($serialNumber);
     
-    if (!$this->looksLike($serialNumber, 'serialNumber')) {
+    if (!self::looksLike($serialNumber, 'serialNumber')) {
       exit('Invalid serial number: ' . $serialNumber);
     }
     
