@@ -72,7 +72,7 @@ class GsxLib
     // there's a session going, put the credentials in there
     if (session_id()) {
       $_SESSION['_gsxlib_session_id'] = $this->session_id;
-      $_SESSION['_gsxlib_session_timeout'] = time()+60*30;
+      $_SESSION['_gsxlib_session_timeout'] = time()+(60*30);
     }
     
   }
@@ -147,6 +147,17 @@ class GsxLib
   
   }
   
+  /**
+   * return the GSX user session ID
+   * I still keep the property private since it should not be modified
+   * outside the constructor
+   * @return string GSX session ID
+   */
+  public function getSessionId()
+  {
+    return $this->session_id;
+  }
+  
   private function request($req)
   {
     $result = false;
@@ -158,7 +169,8 @@ class GsxLib
       $result = $this->client->$r($request);
       $resp = "{$r}Response";
       return $result->$resp;
-    } catch (SoapFault $e) {
+    }
+    catch (SoapFault $e) {
       trigger_error($e->getMessage());
     }
     
