@@ -17,8 +17,8 @@ Best illustrated with a simple example:
     <?php
   
       include 'gsxlib/gsxlib.php';
-      $gsx = new GsxLib('your sold-to account', 'gsx user', 'password');
-      $info = $gsx->warrantyStatus('serialnumber');
+      $gsx = new GsxLib($sold_to, $username, $password);
+      $info = $gsx->warrantyStatus($serialnumber);
       echo $info->productDescription;
       > MacBook Pro (15-inch 2.4/2.2GHz)
     ?>
@@ -27,8 +27,8 @@ If you're in the US, remember to set the fifth argument to the constructor to 'a
 
 ##gsxcl##
 
-The package includes a rudimentary command line client to the GSX API called gsxcl. Currently it can perform warranty checks
-and part lookups.
+The package includes a rudimentary command line client to the GSX API called gsxcl.
+Currently it can perform warranty checks and part lookups.
 
 ##License##
     

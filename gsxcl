@@ -3,6 +3,7 @@
 
 /**
  * gsxlib/gsxcl
+ * A test package and command line client to the GSX library
  * @package gsxlib
  * @author Filipp Lepalaan <filipp@mcare.fi>
  */
