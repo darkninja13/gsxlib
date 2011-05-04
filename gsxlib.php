@@ -78,6 +78,24 @@ class GsxLib
   }
   
   /**
+   * Return details for given dispatch ID
+   * @param string $dispatchId
+   * @return object lookupResponseData
+   */
+  public function repairDetails($dispatchId)
+  {
+    $dispatchId = trim($dispatchId);
+    
+    if (!self::looksLike($dispatchId, 'dispatchId')) {
+      exit('Invalid dispatch ID: ' . $dispatchId);
+    }
+    
+    $req = array('RepairDetails' => array('dispatchId' => $dispatchId));
+    return $this->request($req)->lookupResponseData;
+  
+  }
+  
+  /**
    * a shortcut for looking up part information
    * @param mixed $string
    * @return [bool|string]
@@ -111,11 +129,11 @@ class GsxLib
     $result = false;
     
     $rex = array(
-      'partNumber'                => '/^[a-z]?\d{3}\-\d{4}$/i',
-      'serialNumber'              => '/^[a-z0-9]{11,12}$/i',
-      'eeeCode'                   => '/^[a-z0-9]{3,4}$/i',
-      'repairNumber'              => '/^\d{12}$/',
-      'repairConfirmationNumber'  => '/^G\d{9}$/i'
+      'partNumber'    => '/^[a-z]?\d{3}\-\d{4}$/i',
+      'serialNumber'  => '/^[a-z0-9]{11,12}$/i',
+      'eeeCode'       => '/^[a-z0-9]{3,4}$/i',
+      'repairNumber'  => '/^\d{12}$/',
+      'dispatchId'    => '/^G\d{9}$/i'
     );
     
     foreach ($rex as $k => $v) {
