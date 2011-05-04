@@ -24,11 +24,12 @@ usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-m
   -s  sold-to     your GSX Sold-To account.
   -u  username    the Apple ID with GSX WS API access.
   -p  password    the password for the Apple ID.
-  -r  region      Either "am" (America), "emea" (Europe, Middle-East, Africa)
+  -r  region      either "am" (America), "emea" (Europe, Middle-East, Africa)
                   "apac" (Asia-Pacific) or "la" (Latin America). Defaults to "emea".
-  -e  environment the GSX environment. Either empty (production), "it" or "ut". Defaults to production.
-  -m  mode        What to search for. Currently one of: {$modes_str}. Defaults to "warranty".
-  -q  query       A query string (serial number, order confirmation, repair number, EEE code, etc.
+  -e  environment the GSX environment. Either empty (production), "it" or "ut".
+                  Defaults to production.
+  -m  mode        what to search for. Currently one of: {$modes_str}. Defaults to "warranty".
+  -q  query       a query string (serial number, order confirmation, repair number, EEE code, etc.
                   Defaults to current serial number.
   
 EOT;
