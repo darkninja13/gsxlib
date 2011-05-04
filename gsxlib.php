@@ -18,6 +18,8 @@ class GsxLib
   private $region;
   private $session_id;
   private $environment;
+
+  const timeout = 30;
   
   function __construct($account, $username, $password, $environment = '', $region = 'emea', $tz = 'CEST')
   {
@@ -56,7 +58,8 @@ class GsxLib
         'password'          => $password,
         'serviceAccountNo'  => $account,
         'languageCode'      => 'en',
-        'userTimeZone'      => $tz)
+        'userTimeZone'      => $tz,
+      )
     );
     
     if (@$_SESSION['_gsxlib_session_timeout'] > time()) {
@@ -64,15 +67,19 @@ class GsxLib
     }
     
     try {
-      $this->session_id = $this->client->Authenticate($a)->AuthenticateResponse->userSessionId;
-    } catch (SoapFault $e) {
+      $this->session_id = $this->client
+        ->Authenticate($a)
+        ->AuthenticateResponse
+        ->userSessionId;
+    }
+    catch (SoapFault $e) {
       exit('Authentication with GSX failed. Does this account have access to '.$environment.' ?');
     }
     
     // there's a session going, put the credentials in there
     if (session_id()) {
       $_SESSION['_gsxlib_session_id'] = $this->session_id;
-      $_SESSION['_gsxlib_session_timeout'] = time()+(60*30);
+      $_SESSION['_gsxlib_session_timeout'] = time()+(60*self::timeout);
     }
     
   }
@@ -107,6 +114,59 @@ class GsxLib
     
   }
   
+  public function bulkReturnProforma()
+  {
+    
+  }
+  
+  public function repairLookup($query)
+  {
+    $fields = array(
+      'repairConfirmationNumber'  => '',
+      'customerEmailAddress'      => '',
+      'customerFirstName'         => '',
+      'customerLastName'          => '',
+      'fromDate'                  => '',
+      'toDate'                    => '',
+      'incompleteRepair'          => 'N',
+      'pendingShipment'           => 'N',
+      'purchaseOrderNumber'       => '',
+      'repairNumber'              => '',
+      'repairStatus'              => '',
+      'repairType'                => 'CA',
+      'serialNumber'              => '',
+      'shipToCode'                => '',
+      'soldToReferenceNumber'     => '',
+      'technicianFirstName'       => '',
+      'technicianLastName'        => '',
+      'unreceivedModules'         => 'N',
+    );
+    
+    if (!is_array($query)) {
+      if (self::looksLike($query, 'dispatchId')) {
+        $query = array('repairConfirmationNumber' => $query);
+      } else {
+        exit('Invalid query for repair lookup: ' . $query);
+      } 
+    }
+    
+    foreach ($fields as $k => $v) {
+      if (array_key_exists($k, $query)) {
+        $fields[$k] = $query[$k];
+      }
+    }
+    
+    $req = array('RepairLookup' => array('lookupRequestData' => $fields));
+    return $this->request($req)->lookupResponseData;
+    
+  }
+  
+  /**
+   * List parts pending for return
+   * Default to Open Carry-Ins
+   * @param mixed $repairData
+   * @return mixed
+   */
   public function partsPendingReturn($repairData = null)
   {
     $fields = array(
@@ -124,10 +184,14 @@ class GsxLib
       'createdToDate'             => '',
     );
     
-    if ($repairData) {
-      foreach ($fields as $f) {
-        if (array_key_exists($f, $repairData)) {
-          $fields[$f] = $repairData[$f];
+    if (!is_array($repairData)) {
+      $repairData = array();
+    }
+    
+    if (!empty($repairData)) {
+      foreach ($fields as $k => $v) {
+        if (array_key_exists($k, $repairData)) {
+          $fields[$k] = $repairData[$f];
         }
       }
     }
@@ -160,6 +224,25 @@ class GsxLib
     $req = array('RepairDetails' => array('dispatchId' => $dispatchId));
     return $this->request($req)->lookupResponseData;
   
+  }
+  
+  public function returnLabel($returnOrder, $partNumber)
+  {
+    if (!self::looksLike($returnOrder, 'returnOrder')) {
+      exit('Invalid order number: ' . $returnOrder);
+    }
+    
+    if (!self::partNumber($part, 'partNumber')) {
+      exit('Invalid part number: ' . $partNumber);
+    }
+    
+    $req = array('ReturnLabel' => array(
+      'returnOrderNumber' => $returnOrder,
+      'partNumber' => $partNumber
+    ));
+    
+    return $this->request($req)->returnLabelData;
+    
   }
   
   /**
@@ -246,11 +329,12 @@ class GsxLib
     $result = false;
     
     $rex = array(
-      'partNumber'    => '/^[a-z]?\d{3}\-\d{4}$/i',
+      'partNumber'    => '/^([a-z]{1,2})?\d{3}\-\d{4}$/i',
       'serialNumber'  => '/^[a-z0-9]{11,12}$/i',
       'eeeCode'       => '/^[a-z0-9]{3,4}$/i',
+      'returnOrder'   => '/^7\d{9}$/',
       'repairNumber'  => '/^\d{12}$/',
-      'dispatchId'    => '/^G\d{9}$/i'
+      'dispatchId'    => '/^G\d{9}$/i',
     );
     
     foreach ($rex as $k => $v) {
