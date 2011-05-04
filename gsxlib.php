@@ -107,6 +107,43 @@ class GsxLib
     
   }
   
+  public function partsPendingReturn($repairData = null)
+  {
+    $fields = array(
+      'repairType'                => 'CA',    // default to Carry In repairs
+      'repairStatus'              => 'Open',  // and current ones
+      'purchaseOrderNumber'       => '',
+      'sroNumber'                 => '',
+      'repairConfirmationNumber'  => '',
+      'serialNumber'              => '',
+      'shipToCode'                => '',
+      'customerFirstName'         => '',
+      'customerLastName'          => '',
+      'customerEmailAddress'      => '',
+      'createdFromDate'           => '',
+      'createdToDate'             => '',
+    );
+    
+    if ($repairData) {
+      foreach ($fields as $f) {
+        if (array_key_exists($f, $repairData)) {
+          $fields[$f] = $repairData[$f];
+        }
+      }
+    }
+    
+    $req = array('PartsPendingReturn' => array('repairData' => $fields));
+    
+    return $this->request($req)->partsPendingResponse;
+    
+  }
+  
+  public function compTiaCodes()
+  {
+    $result = $this->request(array('ComptiaCodeLookup' => array()));
+    return $result->comptiaInfo;
+  }
+  
   /**
    * Return details for given dispatch ID
    * @param string $dispatchId
@@ -158,9 +195,9 @@ class GsxLib
       exit('Invalid serial number: ' . $serialNumber);
     }
     
-    $a = array(
-      'WarrantyStatus' => array('unitDetail'  => array('serialNumber' => $serialNumber))
-      );
+    $a = array('WarrantyStatus' => array(
+      'unitDetail'  => array('serialNumber' => $serialNumber)
+    ));
     
     return $this->request($a)->warrantyDetailInfo;
   
