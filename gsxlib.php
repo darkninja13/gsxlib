@@ -66,7 +66,7 @@ class GsxLib
     try {
       $this->session_id = $this->client->Authenticate($a)->AuthenticateResponse->userSessionId;
     } catch (SoapFault $e) {
-      exit('Authentication with GSX failed. Does this GSX account have access to this environment?');
+      exit('Authentication with GSX failed. Does this account have access to '.$environment.' ?');
     }
     
     // there's a session going, put the credentials in there
@@ -74,6 +74,36 @@ class GsxLib
       $_SESSION['_gsxlib_session_id'] = $this->session_id;
       $_SESSION['_gsxlib_session_timeout'] = time()+(60*30);
     }
+    
+  }
+  
+  /**
+   * Get current GSX status of repair
+   * @param mixed $dispatchId
+   */
+  public function repairStatus($dispatchId)
+  {
+    $toCheck = array();
+    
+    if (!is_array($dispatchId)) {
+      $dispatchId = array($dispatchId);
+    }
+    
+    foreach ($dispatchId as $id) {
+      if (self::looksLike($id, 'dispatchId')) {
+        $toCheck[] = $id;
+      }
+    }
+    
+    if (empty($toCheck)) {
+      exit('No valid dispatch IDs given');
+    }
+    
+    $req = array('RepairStatus' => array(
+      'repairConfirmationNumbers' => $toCheck
+    ));
+    
+    return $this->request($req)->repairStatus;
     
   }
   
@@ -114,35 +144,6 @@ class GsxLib
     ));
     
     return $this->request($req)->parts;
-  
-  }
-  
-  /**
-   * Try to "categorise" a string
-   * About identifying serial numbers - before 2010, Apple had a logical
-   *  serial number format, with structure, that you could id quite reliably.
-   *  unfortunately, it's no longer the case
-   * @param string $string
-   */
-  static function looksLike($string, $what = null)
-  {
-    $result = false;
-    
-    $rex = array(
-      'partNumber'    => '/^[a-z]?\d{3}\-\d{4}$/i',
-      'serialNumber'  => '/^[a-z0-9]{11,12}$/i',
-      'eeeCode'       => '/^[a-z0-9]{3,4}$/i',
-      'repairNumber'  => '/^\d{12}$/',
-      'dispatchId'    => '/^G\d{9}$/i'
-    );
-    
-    foreach ($rex as $k => $v) {
-      if (preg_match($v, $string)) {
-        $result = $k;
-      }
-    }
-    
-    return ($what) ? ($result == $what) : $result;
   
   }
   
@@ -194,6 +195,35 @@ class GsxLib
     
     return $result;
     
+  }
+  
+  /**
+   * Try to "categorise" a string
+   * About identifying serial numbers - before 2010, Apple had a logical
+   *  serial number format, with structure, that you could id quite reliably.
+   *  unfortunately, it's no longer the case
+   * @param string $string
+   */
+  static function looksLike($string, $what = null)
+  {
+    $result = false;
+    
+    $rex = array(
+      'partNumber'    => '/^[a-z]?\d{3}\-\d{4}$/i',
+      'serialNumber'  => '/^[a-z0-9]{11,12}$/i',
+      'eeeCode'       => '/^[a-z0-9]{3,4}$/i',
+      'repairNumber'  => '/^\d{12}$/',
+      'dispatchId'    => '/^G\d{9}$/i'
+    );
+    
+    foreach ($rex as $k => $v) {
+      if (preg_match($v, $string)) {
+        $result = $k;
+      }
+    }
+    
+    return ($what) ? ($result == $what) : $result;
+  
   }
   
 }
