@@ -8,9 +8,12 @@
  * @author Filipp Lepalaan <filipp@mcare.fi>
  */
 
-if (false) {
+if (FALSE) {
   error_reporting(E_ALL|E_STRICT);
 }
+
+$modes = array('warranty', 'parts', 'pending', 'repair', 'lookup', 'status', 'label');
+$modes_str = implode(', ', $modes);
 
 require 'gsxlib.php';
 
@@ -24,7 +27,7 @@ usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-m
   -r  region      Either "am" (America), "emea" (Europe, Middle-East, Africa)
                   "apac" (Asia-Pacific) or "la" (Latin America). Defaults to "emea".
   -e  environment the GSX environment. Either empty (production), "it" or "ut". Defaults to production.
-  -m  mode        What to search for. Currently either "warranty" (default) or "parts"
+  -m  mode        What to search for. Currently one of: {$modes_str}. Defaults to "warranty".
   -q  query       A query string (serial number, order confirmation, repair number, EEE code, etc.
                   Defaults to current serial number.
   
@@ -32,19 +35,44 @@ EOT;
   exit();
 }
 
-$opts = getopt('s:u:p:r:e:m:q::');
+$opts = getopt('s:u:p:r:e:m:q:');
 $gsx = new GsxLib($opts['s'], $opts['u'], $opts['p'], $opts['e'], $opts['r']);
 
 if (empty($opts['q'])) {
-  $opts['q'] = `system_profiler SPHardwareDataType | awk '/Serial Number/ {print $4}'`;
+  $opts['q'] = `/usr/sbin/system_profiler SPHardwareDataType | awk '/Serial Number/ {print $4}'`;
 }
 
-switch ($opts['m']) {
+switch ($opts['m'])
+{
   case 'warranty':
     print_r($gsx->warrantyStatus($opts['q']));
     break;
   case 'parts':
     print_r($gsx->partsLookup($opts['q']));
+    break;
+  case 'pending':
+    print_r($gsx->partsPendingReturn($opts['q']));
+    break;
+  case 'repair':
+    print_r($gsx->repairDetails($opts['q']));
+    break;
+  case 'lookup':
+    print_r($gsx->repairLookup($opts['q']));
+    break;
+  case 'status':
+    print_r($gsx->repairStatus($opts['q']));
+    break;
+  case 'comptia':
+    print_r($gsx->compTiaCodes());
+    break;
+  case 'label':
+    list($order, $part) = explode(':', $opts['q']);
+    $result = $gsx->returnLabel($order, $part);
+    $name = $result->returnLabelFileName;
+    echo $result->returnLabelFileData;
+    break;
+  default:
+    print_r($gsx->warrantyStatus($opts['q']));
     break;
 }
 
