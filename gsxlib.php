@@ -232,7 +232,7 @@ class GsxLib
       exit('Invalid order number: ' . $returnOrder);
     }
     
-    if (!self::partNumber($part, 'partNumber')) {
+    if (!self::looksLike($partNumber, 'partNumber')) {
       exit('Invalid part number: ' . $partNumber);
     }
     
