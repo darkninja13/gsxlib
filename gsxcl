@@ -21,26 +21,44 @@ if (count($argv) < 6) {
   echo <<<EOT
 
 usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-m warranty|parts] [-q query]
-  -s  sold-to     your GSX Sold-To account.
-  -u  username    the Apple ID with GSX WS API access.
-  -p  password    the password for the Apple ID.
+  -s  sold-to     your GSX Sold-To account
+  -u  username    the Apple ID with GSX WS API access
+  -p  password    the password for the Apple ID
   -r  region      either "am" (America), "emea" (Europe, Middle-East, Africa)
                   "apac" (Asia-Pacific) or "la" (Latin America). Defaults to "emea".
-  -e  environment the GSX environment. Either empty (production), "it" or "ut".
-                  Defaults to production.
-  -m  mode        what to search for. Currently one of: {$modes_str}. Defaults to "warranty".
-  -q  query       a query string (serial number, order confirmation, repair number, EEE code, etc.
-                  Defaults to current serial number.
+  -e  environment the GSX environment. Either empty (production), "it" or "ut"
+                  Defaults to production
+  -m  mode        what to search for. Currently one of: {$modes_str}. Defaults to "warranty"
+  -q  query       a query string (serial number, order confirmation, repair number, EEE code, etc
+                  Defaults to this machine's serial number
   
 EOT;
   exit();
 }
 
-$opts = getopt('s:u:p:r:e:m:q:');
-$gsx = new GsxLib($opts['s'], $opts['u'], $opts['p'], $opts['e'], $opts['r']);
+$opts = getopt('s:u:p:i::r:e:m:q:');
+$region = ($opts['r']) ? $opts['r'] : 'emea';
+$environment = ($opts['e']) ? $opts['e'] : null;
+
+$gsx = new GsxLib($opts['s'], $opts['u'], $opts['p'], $environment, $region);
 
 if (empty($opts['q'])) {
   $opts['q'] = `/usr/sbin/system_profiler SPHardwareDataType | awk '/Serial Number/ {print $4}'`;
+}
+
+if (isset($opts['i']))
+{
+  if (!function_exists('readline')) {
+    exit("Sorry, but your PHP lacks readline support\n");
+  }
+  
+  echo "Entering interactive mode\n";
+  
+  while ($line != 'quit')
+  {
+    $line = readline('gsx: ');
+    readline_add_history($line);
+  }
 }
 
 switch ($opts['m'])
