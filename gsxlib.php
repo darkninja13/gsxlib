@@ -238,7 +238,7 @@ class GsxLib
     
     $req = array('ReturnLabel' => array(
       'returnOrderNumber' => $returnOrder,
-      'partNumber' => $partNumber
+      'partNumber'        => $partNumber
     ));
     
     return $this->request($req)->returnLabelData;
@@ -273,6 +273,8 @@ class GsxLib
   public function warrantyStatus($serialNumber)
   {
     $serialNumber = trim($serialNumber);
+    // SNs should never start with an S, but they're often coded into barcodes
+    $serialNumber = ltrim($serialNumber, 'sS');
     
     if (!self::looksLike($serialNumber, 'serialNumber')) {
       exit('Invalid serial number: ' . $serialNumber);
@@ -348,6 +350,5 @@ class GsxLib
   }
   
 }
-
 
 ?>
