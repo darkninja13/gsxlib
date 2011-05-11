@@ -6,9 +6,15 @@
  * A test package and command line client to the GSX library
  * @package gsxlib
  * @author Filipp Lepalaan <filipp@mcare.fi>
+ * @license
+ * This program is free software. It comes without any warranty, to
+ * the extent permitted by applicable law. You can redistribute it
+ * and/or modify it under the terms of the Do What The Fuck You Want
+ * To Public License, Version 2, as published by Sam Hocevar. See
+ * http://sam.zoy.org/wtfpl/COPYING for more details.
  */
 
-if (FALSE) {
+if (TRUE) {
   error_reporting(E_ALL|E_STRICT);
 }
 
@@ -20,7 +26,7 @@ require 'gsxlib.php';
 if (count($argv) < 6) {
   echo <<<EOT
 
-usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-m warranty|parts] [-q query]
+usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-f format] [-m warranty|parts] [-q query]
   -s  sold-to     your GSX Sold-To account
   -u  username    the Apple ID with GSX WS API access
   -p  password    the password for the Apple ID
@@ -28,6 +34,7 @@ usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-m
                   "apac" (Asia-Pacific) or "la" (Latin America). Defaults to "emea".
   -e  environment the GSX environment. Either empty (production), "it" or "ut"
                   Defaults to production
+  -f  format      the output format. Either print_r (default), json, xml or csv
   -m  mode        what to search for. Currently one of: {$modes_str}. Defaults to "warranty"
   -q  query       a query string (serial number, order confirmation, repair number, EEE code, etc
                   Defaults to this machine's serial number
@@ -36,14 +43,19 @@ EOT;
   exit();
 }
 
-$opts = getopt('s:u:p:i::r:e:m:q:');
-$region = ($opts['r']) ? $opts['r'] : 'emea';
-$environment = ($opts['e']) ? $opts['e'] : null;
+$opts = getopt('s:u:p:i::r:e:m:q:f:');
+
+$region = (isset($opts['r'])) ? $opts['r'] : 'emea';
+$mode = (isset($opts['m'])) ? $opts['m'] : 'warranty';
+$format = (isset($opts['f'])) ? $opts['f'] : 'print_r';
+$environment = (isset($opts['e'])) ? $opts['e'] : null;
 
 $gsx = new GsxLib($opts['s'], $opts['u'], $opts['p'], $environment, $region);
 
-if (empty($opts['q'])) {
-  $opts['q'] = `/usr/sbin/system_profiler SPHardwareDataType | awk '/Serial Number/ {print $4}'`;
+if (!isset($opts['q'])) {
+  $query = `/usr/sbin/system_profiler SPHardwareDataType | awk '/Serial Number/ {print $4}'`;
+} else {
+  $query = $opts['q'];
 }
 
 if (isset($opts['i']))
@@ -61,37 +73,95 @@ if (isset($opts['i']))
   }
 }
 
-switch ($opts['m'])
+switch ($mode)
 {
   case 'warranty':
-    print_r($gsx->warrantyStatus($opts['q']));
+    $result = $gsx->warrantyStatus($query);
     break;
   case 'parts':
-    print_r($gsx->partsLookup($opts['q']));
+    $result = $gsx->partsLookup($query);
     break;
   case 'pending':
-    print_r($gsx->partsPendingReturn($opts['q']));
+    $result = $gsx->partsPendingReturn($query);
     break;
   case 'repair':
-    print_r($gsx->repairDetails($opts['q']));
+    $result = $gsx->repairDetails($query);
     break;
   case 'lookup':
-    print_r($gsx->repairLookup($opts['q']));
+    $result = $gsx->repairLookup($query);
     break;
   case 'status':
-    print_r($gsx->repairStatus($opts['q']));
+    $result = $gsx->repairStatus($query);
     break;
   case 'comptia':
-    print_r($gsx->compTiaCodes());
+    $result = $gsx->compTiaCodes();
     break;
   case 'label':
-    list($order, $part) = explode(':', $opts['q']);
+    list($order, $part) = explode(':', $query);
     $result = $gsx->returnLabel($order, $part);
     $name = $result->returnLabelFileName;
     echo $result->returnLabelFileData;
     break;
+}
+
+switch ($format)
+{
+  case 'json':
+    echo json_encode($result);
+    break;
+  case 'xml':
+    $xml = simplexml_load_string('<?xml version="1.0" encoding="utf-8"?><gsxResult />');
+    foreach ($result as $k => $v)
+    {
+      $key = (is_numeric($k)) ? 'item' : $k;
+      $value = (is_object($v)) ? null : $v;
+      $item = $xml->addChild($key, $value);
+      if (is_object($v)) {
+        foreach ($v as $vk => $vv) {
+          $item->addChild($vk, $vv);
+        }
+      }
+    }
+    echo $xml->asXML();
+    break;
+  case 'csv':
+    $i = 0;
+    $fo = fopen('php://stdout', 'w');
+    
+    foreach ($result as $k => $v)
+    {
+      if (is_object($v))
+      {
+        $keys = array();
+        $vals = array();
+        foreach ($v as $vk => $vv) 
+        {
+          if ($i == 0) {
+            $keys[] = $vk;
+          }
+          $vals[] = $vv;
+        }
+        // treat field names of first item as header row
+        if ($i == 0) {
+          fputcsv($fo, $keys);
+        }
+        fputcsv($fo, $vals);
+      } else {
+        $keys[] = $k;
+        $vals[] = $v;
+      }
+      $i++;
+    }
+    
+    if (count($result) === 1) {
+      fputcsv($fo, $keys);
+      fputcsv($fo, $vals);
+    }
+    
+    fclose($fo);
+    break;
   default:
-    print_r($gsx->warrantyStatus($opts['q']));
+    print_r($result);
     break;
 }
 

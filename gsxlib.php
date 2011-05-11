@@ -4,7 +4,6 @@
  * @package gsxlib
  * @author Filipp Lepalaan <filipp@mcare.fi>
  * http://gsxwsut.apple.com/apidocs/html/WSReference.html?user=asp
- * http://gsxwsut.apple.com/apidocs/html/WSArtifacts.html?user=asp
  * @license
  * This program is free software. It comes without any warranty, to
  * the extent permitted by applicable law. You can redistribute it
@@ -226,6 +225,11 @@ class GsxLib
   
   }
   
+  /**
+   * Get PDF label for part return
+   * @param string $returnOrder order number
+   * @param string $partNumber code of part being returned
+   */
   public function returnLabel($returnOrder, $partNumber)
   {
     if (!self::looksLike($returnOrder, 'returnOrder')) {
@@ -274,17 +278,19 @@ class GsxLib
   {
     $serialNumber = trim($serialNumber);
     // SNs should never start with an S, but they're often coded into barcodes
+    // and since an "old- ormat" SN + S would still qualify as a "new format" SN,
+    // we strip it here
     $serialNumber = ltrim($serialNumber, 'sS');
     
     if (!self::looksLike($serialNumber, 'serialNumber')) {
       exit('Invalid serial number: ' . $serialNumber);
     }
     
-    $a = array('WarrantyStatus' => array(
+    $req = array('WarrantyStatus' => array(
       'unitDetail'  => array('serialNumber' => $serialNumber)
     ));
     
-    return $this->request($a)->warrantyDetailInfo;
+    return $this->request($req)->warrantyDetailInfo;
   
   }
   
@@ -299,10 +305,16 @@ class GsxLib
     return $this->session_id;
   }
   
+  /**
+   * Do the actual SOAP request
+   */
   private function request($req)
   {
-    $result = false;
+    $result = FALSE;
+    
+    // split the request name and data
     list($r, $p) = each($req);
+    // add session info
     $p['userSession'] = array('userSessionId' => $this->session_id);
     $request = array($r.'Request' => $p);
     
@@ -312,6 +324,7 @@ class GsxLib
       return $result->$resp;
     }
     catch (SoapFault $e) {
+      print($this->client->__getLastRequest());
       trigger_error($e->getMessage());
     }
     
@@ -322,9 +335,9 @@ class GsxLib
   /**
    * Try to "categorise" a string
    * About identifying serial numbers - before 2010, Apple had a logical
-   *  serial number format, with structure, that you could id quite reliably.
-   *  unfortunately, it's no longer the case
-   * @param string $string
+   * serial number format, with structure, that you could id quite reliably.
+   * unfortunately, it's no longer the case
+   * @param string $string string to check
    */
   static function looksLike($string, $what = null)
   {
