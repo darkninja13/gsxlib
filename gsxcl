@@ -26,19 +26,20 @@ require 'gsxlib.php';
 if (count($argv) < 6) {
   echo <<<EOT
 
-usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-f format] [-m warranty|parts] [-q query]
+usage: gsxcl -s sold-to -u username -p password [-r region] [-e environment] [-f format] [-m mode] [-q query]
   -s  sold-to     your GSX Sold-To account
   -u  username    the Apple ID with GSX WS API access
   -p  password    the password for the Apple ID
-  -r  region      either "am" (America), "emea" (Europe, Middle-East, Africa)
-                  "apac" (Asia-Pacific) or "la" (Latin America). Defaults to "emea".
+  -r  region      either "am" (America), "emea" (default, Europe, Middle-East, Africa)
+                  "apac" (Asia-Pacific) or "la" (Latin America)
   -e  environment the GSX environment. Either empty (production), "it" or "ut"
                   Defaults to production
   -f  format      the output format. Either print_r (default), json, xml or csv
-  -m  mode        what to search for. Currently one of: {$modes_str}. Defaults to "warranty"
+  -m  mode        what to search for. Currently one of: {$modes_str}.
+                  Defaults to "warranty"
   -q  query       a query string (serial number, order confirmation, repair number, EEE code, etc
                   Defaults to this machine's serial number
-  
+
 EOT;
   exit();
 }
