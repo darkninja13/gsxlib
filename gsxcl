@@ -14,7 +14,7 @@
  * http://sam.zoy.org/wtfpl/COPYING for more details.
  */
 
-if (TRUE) {
+if (FALSE) {
   error_reporting(E_ALL|E_STRICT);
 }
 
