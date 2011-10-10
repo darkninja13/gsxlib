@@ -46,7 +46,7 @@ class GsxLib
     
     $wsdl = 'https://gsxws2%s.apple.com/wsdl/%sAsp/gsx-%sAsp.wsdl';
     
-    if( $environemnt == 'ut' ) {
+    if( $environment == 'ut' ) {
     	$wsdl = 'https://gsxws2%s.apple.com/gsx-ws/services/%s/asp?wsdl';
     }
     
