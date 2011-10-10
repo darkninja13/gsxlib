@@ -44,7 +44,14 @@ class GsxLib
       }
     }
     
-    $wsdl = 'https://gsxws'.$environment.'.apple.com/gsx-ws/services/'.$region.'/asp?wsdl';
+    $wsdl = 'https://gsxws2%s.apple.com/wsdl/%sAsp/gsx-%sAsp.wsdl';
+    
+    if( $environemnt == 'ut' ) {
+    	$wsdl = 'https://gsxws2%s.apple.com/gsx-ws/services/%s/asp?wsdl';
+    }
+    
+    $wsdl = sprintf( $wsdl, $environment, $region, $region );
+		
     $this->client = new SoapClient($wsdl, array('exceptions' => TRUE, 'trace' => 1));
     
     if (!$this->client) {
@@ -268,7 +275,7 @@ class GsxLib
     ));
     
     return $this->request($req)->parts;
-  
+    
   }
   
   /**
