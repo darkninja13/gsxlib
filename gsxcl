@@ -18,7 +18,7 @@ if (FALSE) {
   error_reporting(E_ALL|E_STRICT);
 }
 
-$modes = array('warranty', 'parts', 'pending', 'repair', 'lookup', 'status', 'label');
+$modes = array( 'warranty', 'parts', 'pending', 'repair', 'lookup', 'status', 'label', 'model', 'osdispatchdetail' );
 $modes_str = implode(', ', $modes);
 
 require 'gsxlib.php';
@@ -96,6 +96,12 @@ switch ($mode)
     break;
   case 'comptia':
     $result = $gsx->compTiaCodes();
+    break;
+  case 'model':
+    $result = $gsx->productModel( $query );
+    break;
+  case 'osdispatchdetail':
+    $result = $gsx->onsiteDispatchDetail( $query );
     break;
   case 'label':
     list($order, $part) = explode(':', $query);

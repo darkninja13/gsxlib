@@ -79,7 +79,10 @@ class GsxLib
         ->userSessionId;
     }
     catch (SoapFault $e) {
-      exit('Authentication with GSX failed. Does this account have access to '.$environment.' ?');
+    	if( empty( $environment )) {
+    		$environment = 'production';
+    	}
+      exit('Authentication with GSX failed. Does this account have access to '.$environment."?\n");
     }
     
     // there's a session going, put the credentials in there
@@ -281,15 +284,9 @@ class GsxLib
   /**
    * A shortcut for checking warranty status of device
    */
-  public function warrantyStatus($serialNumber)
+  public function warrantyStatus( $serialNumber )
   {
-    $serialNumber = trim($serialNumber);
-    // SNs should never start with an S, but they're often coded into barcodes
-    // and since an "old- ormat" SN + S would still qualify as a "new format" SN,
-    // we strip it here
-    $serialNumber = ltrim($serialNumber, 'sS');
-    
-    if (!self::looksLike($serialNumber, 'serialNumber')) {
+    if( !$this->isValidSerialNumber( $serialNumber )) {
       exit('Invalid serial number: ' . $serialNumber);
     }
     
@@ -299,6 +296,54 @@ class GsxLib
     
     return $this->request($req)->warrantyDetailInfo;
   
+  }
+  
+  public function productModel( $serialNumber )
+  {
+    if( !$this->isValidSerialNumber( $serialNumber )) {
+      exit('Invalid serial number: ' . $serialNumber);
+    }
+    
+    $req = array( 'FetchProductModelRequest' => array(
+			'userSession' => array( 'userSessionId' => $this->session_id ),
+			'productModelRequest' => array( 'serialNumber' => $serialNumber )
+    ));
+    
+		$response = $this->client->FetchProductModel( $req )->FetchProductModelResponse;
+		return $response->productModelResponse;
+    
+  }
+  
+  public function onsiteDispatchDetail( $query )
+  {
+  	if( !self::looksLike( $query, 'dispatchId' )) {
+  		exit( "Invalid dispatch ID: $query" );
+  	}
+  	
+	  $req = array( 'OnsiteDispatchDetailRequest' => array(
+	  	'userSession' => array( 'userSessionId' => $this->session_id ),
+			'lookupRequestData' => array(
+				'dispatchId' => $query,
+				'dispatchSentFromDate' => '',
+				'dispatchSentToDate' => ''
+			)
+    ));
+    
+    $response = $this->client->OnsiteDispatchDetail( $req )->OnsiteDispatchDetailResponse;
+    
+    return $response->onsiteDispatchDetails;
+  
+  }
+  
+  public function isValidSerialNumber( $serialNumber )
+  {
+  	$serialNumber = trim( $serialNumber );
+    // SNs should never start with an S, but they're often coded into barcodes
+    // and since an "old- ormat" SN + S would still qualify as a "new format" SN,
+    // we strip it here and not in self::looksLike
+    $serialNumber = ltrim($serialNumber, 'sS');
+    
+    return self::looksLike( $serialNumber, 'serialNumber' );
   }
   
   /**
@@ -315,24 +360,24 @@ class GsxLib
   /**
    * Do the actual SOAP request
    */
-  private function request($req)
+  private function request( $req )
   {
     $result = FALSE;
     
     // split the request name and data
-    list($r, $p) = each($req);
+    list( $r, $p ) = each( $req );
     // add session info
-    $p['userSession'] = array('userSessionId' => $this->session_id);
-    $request = array($r.'Request' => $p);
-    
+    $p['userSession'] = array( 'userSessionId' => $this->session_id );
+    $request = array( $r.'Request' => $p );
+    print_r( $request );
     try {
-      $result = $this->client->$r($request);
+      $result = $this->client->$r( $request );
       $resp = "{$r}Response";
       return $result->$resp;
     }
     catch (SoapFault $e) {
-      print($this->client->__getLastRequest());
-      trigger_error($e->getMessage());
+      print( $this->client->__getLastRequest() );
+      trigger_error( $e->getMessage() );
     }
     
     return $result;
@@ -346,7 +391,7 @@ class GsxLib
    * unfortunately, it's no longer the case
    * @param string $string string to check
    */
-  static function looksLike($string, $what = null)
+  static function looksLike( $string, $what = null )
   {
     $result = false;
     

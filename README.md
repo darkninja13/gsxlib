@@ -27,8 +27,8 @@ If you're in the US, remember to set the fifth argument to the constructor to 'a
 
 ##gsxcl##
 
-The package includes a rudimentary command line client to the GSX API called gsxcl.
-Currently it can perform warranty checks and part lookups.
+The package includes a rudimentary command line client to the GSX API called gsxcl. It can perform various functions in the library and is meant
+mainly as a simple test tool for the library.
 
 ##License##
     
