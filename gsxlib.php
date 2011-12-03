@@ -97,7 +97,7 @@ class GsxLib
    * Get current GSX status of repair
    * @param mixed $dispatchId
    */
-  public function repairStatus($dispatchId)
+  public function repairStatus( $dispatchId )
   {
     $toCheck = array();
     
@@ -128,7 +128,7 @@ class GsxLib
     
   }
   
-  public function repairLookup($query)
+  public function repairLookup( $query )
   {
     $fields = array(
       'repairConfirmationNumber'  => '',
@@ -151,22 +151,26 @@ class GsxLib
       'unreceivedModules'         => 'N',
     );
     
-    if (!is_array($query)) {
-      if (self::looksLike($query, 'dispatchId')) {
-        $query = array('repairConfirmationNumber' => $query);
-      } else {
-        exit('Invalid query for repair lookup: ' . $query);
-      } 
+    $like = self::looksLike( $query );
+    
+    switch( $like ) {
+    	case 'dispatchId':
+    		$query = array( 'repairConfirmationNumber' => $query );
+    		break;
+    	case 'serialNumber':
+    		$query = array( 'serialNumber' => $query );
+    		break;
     }
     
-    foreach ($fields as $k => $v) {
-      if (array_key_exists($k, $query)) {
-        $fields[$k] = $query[$k];
-      }
-    }
+    $query = array_merge( $fields, $query );
     
-    $req = array('RepairLookup' => array('lookupRequestData' => $fields));
-    return $this->request($req)->lookupResponseData;
+		$req = array( 'RepairLookupRequest' =>
+			array( 'userSession' => array( 'userSessionId' => $this->session_id ), 'lookupRequestData' => $query )
+		);
+    
+    $response = $this->client->RepairLookup( $req )->RepairLookupResponse;
+    
+    return $response->lookupResponseData;
     
   }
   
@@ -313,6 +317,8 @@ class GsxLib
 		return $response->productModelResponse;
     
   }
+  
+  
   
   public function onsiteDispatchDetail( $query )
   {
