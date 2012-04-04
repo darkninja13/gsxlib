@@ -3,7 +3,7 @@
  * gsxlib/gsxlib.php
  * @package gsxlib
  * @author Filipp Lepalaan <filipp@mcare.fi>
- * http://gsxwsut.apple.com/apidocs/html/WSReference.html?user=asp
+ * https://gsxwsut.apple.com/apidocs/html/WSReference.html?user=asp
  * @license
  * This program is free software. It comes without any warranty, to
  * the extent permitted by applicable law. You can redistribute it
@@ -13,413 +13,544 @@
  */
 class GsxLib
 {
-  private $client;
-  private $region;
-  private $session_id;
-  private $environment;
+    private $client;
+    private $region;
+    private $session_id;
+    private $environment;
 
-  const timeout = 30;
-  
-  function __construct($account, $username, $password, $environment = '', $region = 'emea', $tz = 'CEST')
-  {
-    if (!class_exists('SoapClient')) {
-      exit('Looks like your PHP lacks SOAP support');
-    }
-    
-    if (!preg_match('/\d+/', $account)) {
-      exit('Invalid Sold-To: ' . $account);
-    }
-    
-    $regions = array('am', 'emea', 'apac', 'la');
-    
-    if (!in_array($region, $regions)) {
-      exit('Region '.$region.' should be one of: ' . implode(', ', $regions));
-    }
-    
-    $envirs = array('ut', 'it');
-    
-    if (!empty($environment)) {
-      if (!in_array($environment, $envirs)) {
-        exit('Environment '.$environment. ' should be one of: ' . implode(', ', $envirs));
-      }
-    }
-    
-    $wsdl = 'https://gsxws2%s.apple.com/wsdl/%sAsp/gsx-%sAsp.wsdl';
-    
-    if( $environment == 'ut' ) {
-    	$wsdl = 'https://gsxws2%s.apple.com/gsx-ws/services/%s/asp?wsdl';
-    }
-    
-    $wsdl = sprintf( $wsdl, $environment, $region, $region );
-		
-    $this->client = new SoapClient($wsdl, array('exceptions' => TRUE, 'trace' => 1));
-    
-    if (!$this->client) {
-      exit('Failed to create SOAP client.');
-    }
-    
-    $a = array(
-      'AuthenticateRequest' => array(
-        'userId'            => $username,
-        'password'          => $password,
-        'serviceAccountNo'  => $account,
-        'languageCode'      => 'en',
-        'userTimeZone'      => $tz,
-      )
-    );
-    
-    if (@$_SESSION['_gsxlib_session_timeout'] > time()) {
-      return $this->session_id = $_SESSION['_gsxlib_session_id'];
-    }
-    
-    try {
-      $this->session_id = $this->client
-        ->Authenticate($a)
-        ->AuthenticateResponse
-        ->userSessionId;
-    }
-    catch (SoapFault $e) {
-    	if( empty( $environment )) {
-    		$environment = 'production';
-    	}
-      exit('Authentication with GSX failed. Does this account have access to '.$environment."?\n");
-    }
-    
-    // there's a session going, put the credentials in there
-    if (session_id()) {
-      $_SESSION['_gsxlib_session_id'] = $this->session_id;
-      $_SESSION['_gsxlib_session_timeout'] = time()+(60*self::timeout);
-    }
-    
-  }
-  
-  /**
-   * Get current GSX status of repair
-   * @param mixed $dispatchId
-   */
-  public function repairStatus( $dispatchId )
-  {
-    $toCheck = array();
-    
-    if (!is_array($dispatchId)) {
-      $dispatchId = array($dispatchId);
-    }
-    
-    foreach ($dispatchId as $id) {
-      if (self::looksLike($id, 'dispatchId')) {
-        $toCheck[] = $id;
-      }
-    }
-    
-    if (empty($toCheck)) {
-      exit('No valid dispatch IDs given');
-    }
-    
-    $req = array('RepairStatus' => array(
-      'repairConfirmationNumbers' => $toCheck
-    ));
-    
-    return $this->request($req)->repairStatus;
-    
-  }
-  
-  public function bulkReturnProforma()
-  {
-    
-  }
-  
-  public function repairLookup( $query )
-  {
-    $fields = array(
-      'repairConfirmationNumber'  => '',
-      'customerEmailAddress'      => '',
-      'customerFirstName'         => '',
-      'customerLastName'          => '',
-      'fromDate'                  => '',
-      'toDate'                    => '',
-      'incompleteRepair'          => 'N',
-      'pendingShipment'           => 'N',
-      'purchaseOrderNumber'       => '',
-      'repairNumber'              => '',
-      'repairStatus'              => '',
-      'repairType'                => 'CA',
-      'serialNumber'              => '',
-      'shipToCode'                => '',
-      'soldToReferenceNumber'     => '',
-      'technicianFirstName'       => '',
-      'technicianLastName'        => '',
-      'unreceivedModules'         => 'N',
-    );
-    
-    $like = self::looksLike( $query );
-    
-    switch( $like ) {
-    	case 'dispatchId':
-    		$query = array( 'repairConfirmationNumber' => $query );
-    		break;
-    	case 'serialNumber':
-    		$query = array( 'serialNumber' => $query );
-    		break;
-    }
-    
-    $query = array_merge( $fields, $query );
-    
-		$req = array( 'RepairLookupRequest' =>
-			array( 'userSession' => array( 'userSessionId' => $this->session_id ), 'lookupRequestData' => $query )
-		);
-    
-    $response = $this->client->RepairLookup( $req )->RepairLookupResponse;
-    
-    return $response->lookupResponseData;
-    
-  }
-  
-  /**
-   * List parts pending for return
-   * Default to Open Carry-Ins
-   * @param mixed $repairData
-   * @return mixed
-   */
-  public function partsPendingReturn($repairData = null)
-  {
-    $fields = array(
-      'repairType'                => 'CA',    // default to Carry In repairs
-      'repairStatus'              => 'Open',  // and current ones
-      'purchaseOrderNumber'       => '',
-      'sroNumber'                 => '',
-      'repairConfirmationNumber'  => '',
-      'serialNumber'              => '',
-      'shipToCode'                => '',
-      'customerFirstName'         => '',
-      'customerLastName'          => '',
-      'customerEmailAddress'      => '',
-      'createdFromDate'           => '',
-      'createdToDate'             => '',
-    );
-    
-    if (!is_array($repairData)) {
-      $repairData = array();
-    }
-    
-    if (!empty($repairData)) {
-      foreach ($fields as $k => $v) {
-        if (array_key_exists($k, $repairData)) {
-          $fields[$k] = $repairData[$f];
+    //IT: https://gsxws%s.apple.com/wsdl/%sAsp/gsx-%sAsp.wsdl
+    //PROD: https://gsxws2.apple.com/wsdl/%sAsp/gsx-%sAsp.wsdl
+    private $wsdl = 'https://gsxws%s.apple.com/wsdl/%sAsp/gsx-%sAsp.wsdl';
+
+    static $_instance;
+
+    const timeout = 30;     // session timeout in minutes
+
+    public static function getInstance(
+        $account,
+        $username,
+        $password,
+        $environment = '',
+        $region = 'emea',
+        $tz = 'CEST')
+    {
+        if(!(self::$_instance instanceof self)) {
+            self::$_instance = new self(
+                $account,
+                $username,
+                $password,
+                $environment,
+                $region,
+                $tz
+            );
         }
-      }
+
+        return self::$_instance;
+
+    }
+
+    private function __clone() {}
+
+    private function __construct(
+        $account,
+        $username,
+        $password,
+        $environment = '',
+        $region = 'emea',
+        $tz = 'CEST' )
+    {
+        if(!class_exists('SoapClient')) {
+            throw new GsxException('Looks like your PHP lacks SOAP support');
+        }
+
+        if(!preg_match('/\d+/', $account)) {
+            throw new GsxException('Invalid Sold-To: ' . $account);
+        }
+
+        $regions = array('am', 'emea', 'apac', 'la');
+
+        if(!in_array($region, $regions))
+        {
+            $error = 'Region "%s" should be one of: %s';
+            $error = sprintf($error, $region, implode(', ', $regions));
+            throw new GsxException($error);
+        }
+        
+        $envirs = array('ut', 'it');
+        
+        if(!empty($environment))
+        {
+            if(!in_array($environment, $envirs))
+            {
+                $error = 'Environment "%s" should be one of: %s';
+                $error = sprintf($error, $environment, implode(', ', $envirs));
+                throw new GsxException($error);
+            }
+        } else {
+           // GSX2...
+           $environment = '2';
+        }
+        
+        $this->wsdl = sprintf($this->wsdl, $environment, $region, $region);
+        
+        $this->client = new SoapClient(
+            $this->wsdl, array('exceptions' => TRUE, 'trace' => 1)
+        );
+        
+        if(!$this->client) {
+           throw new GsxException('Failed to create SOAP client.');
+        }
+        
+        if(@$_SESSION['_gsxlib_timeout'][$account] > time()) {
+ //          return $this->session_id = $_SESSION['_gsxlib_id'][$account];
+        }
+        
+        $a = array(
+            'AuthenticateRequest' => array(
+                'userId'            => $username,
+                'password'          => $password,
+                'serviceAccountNo'  => $account,
+                'languageCode'      => 'en',
+                'userTimeZone'      => $tz,
+            )
+        );
+syslog(LOG_ERR, print_r($a, true));
+        try {
+            $this->session_id = $this->client
+                ->Authenticate($a)
+                ->AuthenticateResponse
+                ->userSessionId;
+        } catch(SoapFault $e) {
+            if(empty($environment)) $environment = 'production';
+
+            $error = 'Authentication with GSX failed. Does this account have access to '
+                .$environment."?\n";
+            throw new GsxException($error);
+
+        }
+        
+        // there's a session going, put the credentials in there
+        if(session_id()) {
+            $_SESSION['_gsxlib_id'][$account] = $this->session_id;
+            $timeout = time()+(60*self::timeout);
+            $_SESSION['_gsxlib_timeout'][$account] = $timeout;
+        }
+
+    }
+
+    function getClient()
+    {
+        return $this->client;
+    }
+
+    function setClient($client)
+    {
+        $this->client = $client;
+    }
+
+    /**
+     * Get current GSX status of repair
+     * @param mixed $dispatchId
+     */
+    public function repairStatus($dispatchId)
+    {
+        $toCheck = array();
+
+        if(!is_array($dispatchId)) {
+            $dispatchId = array($dispatchId);
+        }
+
+        foreach($dispatchId as $id) {
+            if (self::looksLike($id, 'dispatchId')) {
+                $toCheck[] = $id;
+            }
+        }
+
+        if(empty($toCheck)) {
+            exit('No valid dispatch IDs given');
+        }
+
+        $req = array('RepairStatus' => array(
+            'repairConfirmationNumbers' => $toCheck
+        ));
+
+        return $this->request($req)->repairStatus;
+    
     }
     
-    $req = array('PartsPendingReturn' => array('repairData' => $fields));
-    
-    return $this->request($req)->partsPendingResponse;
-    
-  }
-  
-  public function compTiaCodes()
-  {
-    $result = $this->request(array('ComptiaCodeLookup' => array()));
-    return $result->comptiaInfo;
-  }
-  
-  /**
-   * Return details for given dispatch ID
-   * @param string $dispatchId
-   * @return object lookupResponseData
-   */
-  public function repairDetails($dispatchId)
-  {
-    $dispatchId = trim($dispatchId);
-    
-    if (!self::looksLike($dispatchId, 'dispatchId')) {
-      exit('Invalid dispatch ID: ' . $dispatchId);
+    public function fetchiOsActivation($query)
+    {
+        $like = self::looksLike($query);
+        
+        $request = array('FetchIOSActivationDetails' => array(
+            $like => $query
+        ));
+        
+        return $this->request($request);
+        
     }
     
-    $req = array('RepairDetails' => array('dispatchId' => $dispatchId));
-    return $this->request($req)->lookupResponseData;
-  
-  }
-  
-  /**
-   * Get PDF label for part return
-   * @param string $returnOrder order number
-   * @param string $partNumber code of part being returned
-   */
-  public function returnLabel($returnOrder, $partNumber)
-  {
-    if (!self::looksLike($returnOrder, 'returnOrder')) {
-      exit('Invalid order number: ' . $returnOrder);
+    public function createCarryInRepair($repairData)
+    {
+        $resp = $this->client->CreateCarryInRepair(
+            array('CreateCarryInRequest' => array(
+                'userSession'   => array('userSessionId' => $this->getSessionId()),
+                'repairData'    => $repairData
+            ))
+        );
+        
+        return $resp->CreateCarryInResponse;
+        
     }
     
-    if (!self::looksLike($partNumber, 'partNumber')) {
-      exit('Invalid part number: ' . $partNumber);
+    public function createMailInRepair($repairData)
+    {
+        
     }
     
-    $req = array('ReturnLabel' => array(
-      'returnOrderNumber' => $returnOrder,
-      'partNumber'        => $partNumber
-    ));
-    
-    return $this->request($req)->returnLabelData;
-    
+    public function bulkReturnProforma() {}
+
+    public function repairLookup($query)
+    {
+        $fields = array(
+            'repairConfirmationNumber'  => '',
+            'customerEmailAddress'      => '',
+            'customerFirstName'         => '',
+            'customerLastName'          => '',
+            'fromDate'                  => '',
+            'toDate'                    => '',
+            'incompleteRepair'          => 'N',
+            'pendingShipment'           => 'N',
+            'purchaseOrderNumber'       => '',
+            'repairNumber'              => '',
+            'repairStatus'              => '',
+            'repairType'                => 'CA',
+            'serialNumber'              => '',
+            'shipToCode'                => '',
+            'soldToReferenceNumber'     => '',
+            'technicianFirstName'       => '',
+            'technicianLastName'        => '',
+            'unreceivedModules'         => 'N',
+        );
+
+        // provide "shortcuts" for dispatch ID and SN
+        switch(self::looksLike($query)) {
+            case 'dispatchId':
+                $query = array('repairConfirmationNumber' => $query);
+                break;
+            case 'serialNumber':
+                $query = array('serialNumber' => $query);
+                break;
+        }
+
+        $query = array_merge($fields, $query);
+        $req = array( 'RepairLookupRequest' => array(
+            'userSession' => array('userSessionId' => $this->session_id),
+            'lookupRequestData' => $query 
+        ));
+
+        $response = $this->client->RepairLookup($req)
+            ->RepairLookupResponse;
+        return $response->lookupResponseData;
   }
   
-  /**
-   * a shortcut for looking up part information
-   * @param mixed $string
-   * @return [bool|string]
-   */
-  public function partsLookup($string = null)
-  {
-    $string = trim($string);
-    $what = self::looksLike($string);
+    /**
+    * List parts pending for return
+    * Default to Open Carry-Ins
+    * @param mixed $repairData
+    * @return mixed
+    */
+    public function partsPendingReturn($repairData = null)
+    {
+        $fields = array(
+            'repairType'                => 'CA',    // default to Carry In repairs
+            'repairStatus'              => 'Open',  // and current ones
+            'purchaseOrderNumber'       => '',
+            'sroNumber'                 => '',
+            'repairConfirmationNumber'  => '',
+            'serialNumber'              => '',
+            'shipToCode'                => '',
+            'customerFirstName'         => '',
+            'customerLastName'          => '',
+            'customerEmailAddress'      => '',
+            'createdFromDate'           => '',
+            'createdToDate'             => '',
+        );
     
-    if (!$what) {
-      exit('Invalid search term for part lookup: ' . $string);
+        if( !is_array( $repairData )) {
+            $repairData = array();
+        }
+    
+        if(!empty($repairData)) {
+            foreach($fields as $k => $v) {
+                if(array_key_exists($k, $repairData)) {
+                    $fields[$k] = $repairData[$f];
+                }
+            }
+        }
+    
+        $req = array('PartsPendingReturn' => array('repairData' => $fields));
+    
+        return $this->request($req)->partsPendingResponse;
+    
     }
     
-    $req = array('PartsLookup' => array(
-      'lookupRequestData' => array($what => $string)
-    ));
-    
-    return $this->request($req)->parts;
-    
-  }
-  
-  /**
-   * A shortcut for checking warranty status of device
-   */
-  public function warrantyStatus( $serialNumber )
-  {
-    if( !$this->isValidSerialNumber( $serialNumber )) {
-      exit('Invalid serial number: ' . $serialNumber);
+    public function fetchDiagnostics($query)
+    {
+        if(!is_array($query)) {
+            $like = self::looksLike($query);
+            $query = array($like => $query);
+        }
+        
+        $req = array('FetchRepairDiagnostic' => array(
+            'lookupRequestData' => $query
+       ));
+        
+        return $this->request($req);
+        
     }
     
-    $req = array('WarrantyStatus' => array(
-      'unitDetail'  => array('serialNumber' => $serialNumber)
-    ));
-    
-    return $this->request($req)->warrantyDetailInfo;
+    public function compTiaCodes()
+    {
+        try {
+            $result = $this->client->CompTIACodes(
+            array('ComptiaCodeLookupRequest' =>
+                array('userSession' => array('userSessionId' => $this->session_id)))
+            );
+        } catch (Exception $e) {
+            syslog(LOG_ERR, $e->getMessage());
+            syslog(LOG_ERR, $this->client->__getLastRequest());
+            syslog(LOG_ERR, $this->client->__getLastResponse());
+        }
+        
+        $response = $result->ComptiaCodeLookupResponse;
+        return $response->comptiaInfo;
+    }
   
-  }
+    /**
+    * Return details for given dispatch ID
+    * @param string $dispatchId
+    * @return object lookupResponseData
+    */
+    public function repairDetails($dispatchId)
+    {
+        $dispatchId = trim($dispatchId);
+
+        if( !self::looksLike( $dispatchId, 'dispatchId' )) {
+            exit( 'Invalid dispatch ID: ' . $dispatchId );
+        }
+
+        $req = array('RepairDetails' => array('dispatchId' => $dispatchId));
+        return $this->request($req)->lookupResponseData;
+
+    }
+
+    /**
+    * Get PDF label for part return
+    * @param string $returnOrder order number
+    * @param string $partNumber code of part being returned
+    */
+    public function returnLabel($returnOrder, $partNumber)
+    {
+        if(!self::looksLike($returnOrder, 'returnOrder')) {
+            exit('Invalid order number: ' . $returnOrder);
+        }
+
+        if(!self::looksLike($partNumber, 'partNumber')) {
+            exit('Invalid part number: ' . $partNumber);
+        }
+
+        $req = array('ReturnLabel' => array(
+            'returnOrderNumber' => $returnOrder,
+            'partNumber'        => $partNumber
+        ));
+
+        return $this->request($req)->returnLabelData;
+
+    }
+
+    /**
+    * a shortcut for looking up part information
+    * @param mixed $query
+    * @return [bool|string]
+    */
+    public function partsLookup($query = null)
+    {
+        if(is_array($query)) {
+            $req = array('PartsLookup' => array(
+                'lookupRequestData' => $query
+            ));
+        } else {
+            $query = trim($query);
+            $what = self::looksLike($query);
+
+            if(!$what) {
+                throw new GsxException('Invalid search term for part lookup: '.$query);
+            }
+            
+            $query = array($what => $query);
+            
+        }
+
+        $req = array('PartsLookup' => array(
+            'lookupRequestData' => $query
+        ));
+
+        $result = $this->request($req)->parts;
+        // always return an array
+        return (is_array($result)) ? $result : array($result);
+
+    }
+
+    /**
+    * A shortcut for checking warranty status of device
+    */
+    public function warrantyStatus($serialNumber)
+    {
+        if(!$this->isValidSerialNumber($serialNumber)) {
+            exit('Invalid serial number: ' . $serialNumber);
+        }
+
+        $req = array('WarrantyStatus' => array(
+            'unitDetail'  => array('serialNumber' => $serialNumber)
+        ));
+
+        return $this->request($req)->warrantyDetailInfo;
+
+    }
+
+    public function productModel($serialNumber)
+    {
+        if(!$this->isValidSerialNumber($serialNumber)) {
+            exit('Invalid serial number: ' . $serialNumber);
+        }
+
+        $req = array( 'FetchProductModelRequest' => array(
+            'userSession' => array(
+                'userSessionId' => $this->session_id
+            ),
+            'productModelRequest' => array(
+                'serialNumber' => $serialNumber
+            )
+        ));
+
+        $response = $this->client
+            ->FetchProductModel($req)
+            ->FetchProductModelResponse;
+        
+        return $response->productModelResponse;
+    }
+
+    public function onsiteDispatchDetail($query)
+    {
+        if(!self::looksLike($query, 'dispatchId')) {
+            exit( "Invalid dispatch ID: $query" );
+        }
+
+        $req = array('OnsiteDispatchDetailRequest' => array(
+            'userSession' => array('userSessionId' => $this->session_id),
+            'lookupRequestData' => array(
+                'dispatchId' => $query,
+                'dispatchSentFromDate' => '',
+                'dispatchSentToDate' => ''
+            )
+        ));
+
+        $response = $this->client->OnsiteDispatchDetail($req)
+            ->OnsiteDispatchDetailResponse;
+
+        return $response->onsiteDispatchDetails;
+
+    }
+
+    public function isValidSerialNumber($serialNumber)
+    {
+        $serialNumber = trim( $serialNumber );
+        // SNs should never start with an S, but they're often coded into barcodes
+        // and since an "old- ormat" SN + S would still qualify as a "new format" SN,
+        // we strip it here and not in self::looksLike
+        $serialNumber = ltrim($serialNumber, 'sS');
+        
+        return self::looksLike($serialNumber, 'serialNumber');
+        
+    }
   
-  public function productModel( $serialNumber )
-  {
-    if( !$this->isValidSerialNumber( $serialNumber )) {
-      exit('Invalid serial number: ' . $serialNumber);
+    /**
+    * return the GSX user session ID
+    * I still keep the property private since it should not be modified
+    * outside the constructor
+    * @return string GSX session ID
+    */
+    public function getSessionId()
+    {
+        return $this->session_id;
     }
     
-    $req = array( 'FetchProductModelRequest' => array(
-			'userSession' => array( 'userSessionId' => $this->session_id ),
-			'productModelRequest' => array( 'serialNumber' => $serialNumber )
-    ));
-    
-		$response = $this->client->FetchProductModel( $req )->FetchProductModelResponse;
-		return $response->productModelResponse;
-    
-  }
-  
-  
-  
-  public function onsiteDispatchDetail( $query )
-  {
-  	if( !self::looksLike( $query, 'dispatchId' )) {
-  		exit( "Invalid dispatch ID: $query" );
-  	}
-  	
-	  $req = array( 'OnsiteDispatchDetailRequest' => array(
-	  	'userSession' => array( 'userSessionId' => $this->session_id ),
-			'lookupRequestData' => array(
-				'dispatchId' => $query,
-				'dispatchSentFromDate' => '',
-				'dispatchSentToDate' => ''
-			)
-    ));
-    
-    $response = $this->client->OnsiteDispatchDetail( $req )->OnsiteDispatchDetailResponse;
-    
-    return $response->onsiteDispatchDetails;
-  
-  }
-  
-  public function isValidSerialNumber( $serialNumber )
-  {
-  	$serialNumber = trim( $serialNumber );
-    // SNs should never start with an S, but they're often coded into barcodes
-    // and since an "old- ormat" SN + S would still qualify as a "new format" SN,
-    // we strip it here and not in self::looksLike
-    $serialNumber = ltrim($serialNumber, 'sS');
-    
-    return self::looksLike( $serialNumber, 'serialNumber' );
-  }
-  
-  /**
-   * return the GSX user session ID
-   * I still keep the property private since it should not be modified
-   * outside the constructor
-   * @return string GSX session ID
-   */
-  public function getSessionId()
-  {
-    return $this->session_id;
-  }
-  
-  /**
-   * Do the actual SOAP request
-   */
-  private function request( $req )
-  {
-    $result = FALSE;
-    
-    // split the request name and data
-    list( $r, $p ) = each( $req );
-    // add session info
-    $p['userSession'] = array( 'userSessionId' => $this->session_id );
-    $request = array( $r.'Request' => $p );
-    print_r( $request );
-    try {
-      $result = $this->client->$r( $request );
-      $resp = "{$r}Response";
-      return $result->$resp;
+    /**
+    * Do the actual SOAP request
+    */
+    public function request($req)
+    {
+        $result = FALSE;
+
+        // split the request name and data
+        list($r, $p) = each($req);
+
+        // add session info
+        $p['userSession'] = array('userSessionId' => $this->session_id);
+        $request = array($r.'Request' => $p);
+
+        try {
+            $result = $this->client->$r($request);
+            $resp = "{$r}Response";
+            return $result->$resp;
+        } catch(SoapFault $e) {
+            throw new GsxException($e->getMessage(), $this->client->__getLastRequest());
+        }
+
+        return $result;
+
     }
-    catch (SoapFault $e) {
-      print( $this->client->__getLastRequest() );
-      trigger_error( $e->getMessage() );
-    }
+
+    /**
+    * Try to "categorise" a string
+    * About identifying serial numbers - before 2010, Apple had a logical
+    * serial number format, with structure, that you could id quite reliably.
+    * unfortunately, it's no longer the case
+    * @param string $string string to check
+    */
+    static function looksLike($string, $what = null)
+    {
+        $result = false;
+        $rex = array(
+            'partNumber'    => '/^([a-z]{1,2})?\d{3}\-\d{4}$/i',
+            'serialNumber'  => '/^[a-z0-9]{11,12}$/i',
+            'eeeCode'       => '/^[A-Z0-9]{3,4}$/',     // only match ALL-CAPS!
+            'returnOrder'   => '/^7\d{9}$/',
+            'repairNumber'  => '/^\d{12}$/',
+            'dispatchId'    => '/^G\d{9}$/i',
+            'alternateDeviceId'     => '/^\d{15}$/',
+            'diagnosticEventNumber' => '/^\d{23}$/'
+            // 12715075303192012074604
+        );
+
+        foreach ($rex as $k => $v) {
+            if (preg_match($v, $string)) {
+                $result = $k;
+            }
+        }
     
-    return $result;
-    
-  }
-  
-  /**
-   * Try to "categorise" a string
-   * About identifying serial numbers - before 2010, Apple had a logical
-   * serial number format, with structure, that you could id quite reliably.
-   * unfortunately, it's no longer the case
-   * @param string $string string to check
-   */
-  static function looksLike( $string, $what = null )
-  {
-    $result = false;
-    
-    $rex = array(
-      'partNumber'    => '/^([a-z]{1,2})?\d{3}\-\d{4}$/i',
-      'serialNumber'  => '/^[a-z0-9]{11,12}$/i',
-      'eeeCode'       => '/^[a-z0-9]{3,4}$/i',
-      'returnOrder'   => '/^7\d{9}$/',
-      'repairNumber'  => '/^\d{12}$/',
-      'dispatchId'    => '/^G\d{9}$/i',
-    );
-    
-    foreach ($rex as $k => $v) {
-      if (preg_match($v, $string)) {
-        $result = $k;
-      }
-    }
-    
-    return ($what) ? ($result == $what) : $result;
+        return ($what) ? ($result == $what) : $result;
   
   }
   
 }
 
-?>
+class GsxException extends Exception
+{
+    function __construct($message, $request = null)
+    {
+        $this->request = $request;
+        $this->message = $message;
+    }
+}

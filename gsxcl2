@@ -1,0 +1,55 @@
+#! /usr/bin/env php
+<?php
+
+if (TRUE) {
+  error_reporting( E_ALL|E_STRICT );
+}
+
+require 'gsxlib.php';
+
+$opts = getopt( 's:u:p:r:e:m:q:f:d:' );
+
+$region = (isset($opts['r'])) ? $opts['r'] : 'emea';
+$format = (isset($opts['f'])) ? $opts['f'] : 'print_r';
+$environment = (isset($opts['e'])) ? $opts['e'] : null;
+
+$gsx = GsxLib::getInstance($opts['s'], $opts['u'], $opts['p'], $environment, $region);
+
+$api = $argv[7];
+$valid = false;
+
+$client = $gsx->getClient();
+$functions = $client->__getFunctions();
+
+if($argv[8] == 'list') {
+    print_r($functions);
+    exit();
+}
+
+foreach($functions as $f) {
+    if(strstr($f, $api)) {
+        $valid = true;
+    }
+}
+
+if(!$valid) {
+    exit(sprintf('Function "%s" is invalid', $api));
+}
+
+$params = json_decode($argv[8], TRUE);
+
+if($params === NULL) {
+    exit('Invalid params!');
+}
+
+$session = array('userSession' => array('userSessionId' => $gsx->getSessionId()));
+$req = "{$api}Request";
+
+if($api == 'CompTIACodes') {
+    $req = 'ComptiaCodeLookupRequest';
+}
+
+$request = array($req => array_merge($params, $session));
+$result = $client->$api($request);
+
+print_r($result);

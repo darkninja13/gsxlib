@@ -7,8 +7,7 @@ validation (as opposed to burdening Apple's servers with totally invalid request
 
 ##Requrements##
 
-Your PHP should have SOAP support enabled. Most distributions should (including OS X Server 10.6 or later).
-For more details, consult your distribution or the [PHP documentation][2].
+Your PHP must have SOAP support. Most distributions should (including OS X Server 10.6 or later). For more details, consult your distribution or the [PHP documentation][2].
 
 ##Usage##
 
@@ -21,13 +20,14 @@ Best illustrated with a simple example:
       $info = $gsx->warrantyStatus($serialnumber);
       echo $info->productDescription;
       > MacBook Pro (15-inch 2.4/2.2GHz)
+      
     ?>
 
 If you're in the US, remember to set the fifth argument to the constructor to 'am'.
 
 ##gsxcl##
 
-The package includes a rudimentary command line client to the GSX API called gsxcl. It can perform various functions in the library and is meant
+The package includes a rudimentary command line client to the GSX API called _gsxcl_. It can perform various functions in the library and is meant
 mainly as a simple test tool for the library.
 
 ##License##
