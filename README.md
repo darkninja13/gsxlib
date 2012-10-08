@@ -16,7 +16,7 @@ Best illustrated with a simple example:
     <?php
   
       include 'gsxlib/gsxlib.php';
-      $gsx = new GsxLib($sold_to, $username, $password);
+      $gsx = GsxLib::getInstance($sold_to, $username, $password);
       $info = $gsx->warrantyStatus($serialnumber);
       echo $info->productDescription;
       > MacBook Pro (15-inch 2.4/2.2GHz)
